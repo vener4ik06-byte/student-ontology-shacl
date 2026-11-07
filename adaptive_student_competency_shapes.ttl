@@ -1,59 +1,196 @@
-@prefix ex: <https://example.org/adaptive-student-competency-model#> .
-@prefix sh: <http://www.w3.org/ns/shacl#> .
-@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
-@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix sh:    <http://www.w3.org/ns/shacl#> .
+@prefix rdf:   <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs:  <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:   <http://www.w3.org/2001/XMLSchema#> .
+@prefix owl:   <http://www.w3.org/2002/07/owl#> .
+@prefix match: <https://example.org/match-decision-history#> .
 
-# Примечание по GoalShape:
-# Правило «каждая цель связана ровно с одним студентом» сохранено в OWL TBox
-# исходного RDF через owl:qualifiedCardinality 1 по обратному свойству.
-# В используемой конфигурации Ontosphere SHACL Core inversePath дал ложное
-# нарушение, а sh:sparql привёл к SPARQLConstraintComponent error.
-# Поэтому это правило проверяется отдельным обычным SPARQL SELECT-запросом,
-# который приложен в goal_student_count.rq. Классы и свойства модели не меняются.
+<https://example.org/match-decision-history-shapes>
+    a owl:Ontology ;
+    rdfs:label "SHACL-ограничения для модели истории матча"@ru ;
+    rdfs:comment "Набор SHACL Core shapes для проверки данного учебного сценария: матч команды А и команды Б, первоначальное признание А, пересмотренное признание Б и последующая отмена пересмотра с восстановлением первоначального признания. Ограничение ровно на три исторических решения относится к этому конкретному снимку модели, а не является универсальным правилом для любых матчей."@ru .
 
-# Если у освоения указан уровень больше 0, оно должно иметь доказательство.
-ex:MasteryShape a sh:NodeShape ;
-    sh:targetClass ex:CompetenceMastery ;
-    sh:or (
-        [
-            sh:property [
-                sh:path ex:competenceMasteryLevel ;
-                sh:maxInclusive 0
-            ]
-        ]
-        [
-            sh:property [
-                sh:path ex:competenceMasteryProvesEvidence ;
-                sh:minCount 1
-            ]
-        ]
-    ) ;
-    sh:message "Освоение с уровнем больше 0 должно иметь хотя бы одно доказательство."@ru .
-
-# Каждое требование роли указывает ровно на одну компетенцию.
-ex:RoleRequirementShape a sh:NodeShape ;
-    sh:targetClass ex:RoleRequirement ;
+# Общие требования к каждому акту судей: один порядковый номер и одно описание времени.
+match:DecisionRecordShape
+    a sh:NodeShape ;
+    sh:targetObjectsOf match:hasDecision, match:hasLatestDecision ;
     sh:property [
-        sh:path ex:roleRequirementRequiresCompetence ;
-        sh:class ex:Competence ;
+        sh:path match:decisionSequence ;
         sh:minCount 1 ;
-        sh:maxCount 1
+        sh:maxCount 1 ;
+        sh:datatype xsd:integer ;
+        sh:minInclusive 1 ;
+        sh:message "У каждого решения должен быть ровно один положительный целочисленный порядковый номер."@ru
+    ] ;
+    sh:property [
+        sh:path match:decisionTiming ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:datatype xsd:string ;
+        sh:message "У каждого решения должно быть ровно одно текстовое описание времени принятия."@ru
     ] .
 
-# Каждая профессиональная роль имеет хотя бы одно требование.
-ex:RoleShape a sh:NodeShape ;
-    sh:targetClass ex:ProfessionalRole ;
+# Игровой исход отделен от решений судей. У него ровно один победитель и проигравший,
+# причем это должны быть разные команды.
+match:SportingOutcomeShape
+    a sh:NodeShape ;
+    sh:targetClass match:SportingOutcome ;
     sh:property [
-        sh:path ex:professionalRoleHasRequirement ;
-        sh:class ex:RoleRequirement ;
-        sh:minCount 1
+        sh:path match:sportingWinner ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:class match:Team ;
+        sh:hasValue match:teamA ;
+        sh:nodeKind sh:IRI ;
+        sh:disjoint match:sportingLoser ;
+        sh:message "У игрового исхода должен быть ровно один победитель-команда, отличный от проигравшего."@ru
+    ] ;
+    sh:property [
+        sh:path match:sportingLoser ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:class match:Team ;
+        sh:hasValue match:teamB ;
+        sh:nodeKind sh:IRI ;
+        sh:message "В данном сценарии проигравшей в игровом результате должна быть команда Б."@ru
     ] .
 
-# Каждая траектория развития содержит хотя бы один шаг.
-ex:TrajectoryShape a sh:NodeShape ;
-    sh:targetClass ex:DevelopmentTrajectory ;
+# Любое решение о признании победителя должно указывать ровно одну команду.
+match:RecognitionDecisionShape
+    a sh:NodeShape ;
     sh:property [
-        sh:path ex:developmentTrajectoryConsistsOfStep ;
-        sh:class ex:TrajectoryStep ;
-        sh:minCount 1
+        sh:path match:recognizesWinner ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:class match:Team ;
+        sh:nodeKind sh:IRI ;
+        sh:message "Решение о признании победителя должно указывать ровно одну команду."@ru
+    ] .
+
+match:InitialRecognitionShape
+    a sh:NodeShape ;
+    sh:targetClass match:InitialRecognition ;
+    sh:node match:RecognitionDecisionShape ;
+    sh:property [
+        sh:path match:recognizesWinner ;
+        sh:hasValue match:teamA ;
+        sh:message "В первоначальном решении победителем должна быть признана команда А."@ru
+    ] .
+
+# Для данного сценария пересмотренное решение заменяет первоначальное признание.
+match:RevisedRecognitionShape
+    a sh:NodeShape ;
+    sh:targetClass match:RevisedRecognition ;
+    sh:node match:RecognitionDecisionShape ;
+    sh:property [
+        sh:path match:recognizesWinner ;
+        sh:hasValue match:teamB ;
+        sh:message "В пересмотренном решении победителем должна быть признана команда Б."@ru
+    ] ;
+    sh:property [
+        sh:path match:replacesDecision ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:class match:InitialRecognition ;
+        sh:hasValue match:decision1_initial ;
+        sh:nodeKind sh:IRI ;
+        sh:message "В данном сценарии пересмотренное решение должно заменять первоначальное решение 1."@ru
+    ] .
+
+# Отмена не создает еще одного победителя: она отменяет пересмотренное решение
+# и отдельно указывает первоначальное признание, которое восстанавливается.
+match:CancellationDecisionShape
+    a sh:NodeShape ;
+    sh:targetClass match:CancellationDecision ;
+    sh:property [
+        sh:path match:cancelsDecision ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:class match:RevisedRecognition ;
+        sh:hasValue match:decision2_revision ;
+        sh:nodeKind sh:IRI ;
+        sh:disjoint match:reinstatesDecision ;
+        sh:message "Решение об отмене должно отменять ровно одно пересмотренное признание; отменяемое и восстанавливаемое решения не могут быть одним узлом."@ru
+    ] ;
+    sh:property [
+        sh:path match:reinstatesDecision ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:class match:InitialRecognition ;
+        sh:hasValue match:decision1_initial ;
+        sh:nodeKind sh:IRI ;
+        sh:message "Решение об отмене должно восстановить первоначальное решение 1."@ru
+    ] .
+
+# Проверка матча в текущем состоянии после отмены:
+# один игровой исход, три исторических акта судей, одно действующее признание
+# (первоначальное) и один последний акт судей (отмена).
+match:MatchShape
+    a sh:NodeShape ;
+    sh:targetClass match:Match ;
+    sh:property [
+        sh:path match:hasSportingOutcome ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:class match:SportingOutcome ;
+        sh:node match:SportingOutcomeShape ;
+        sh:nodeKind sh:IRI ;
+        sh:message "У матча должен быть ровно один связанный фактический игровой исход."@ru
+    ] ;
+    sh:property [
+        sh:path match:hasDecision ;
+        sh:minCount 3 ;
+        sh:maxCount 3 ;
+        sh:node match:DecisionRecordShape ;
+        sh:node [
+            sh:or (
+                [ sh:class match:InitialRecognition ]
+                [ sh:class match:RevisedRecognition ]
+                [ sh:class match:CancellationDecision ]
+            ) ;
+            sh:message "Историческая запись должна быть первоначальным признанием, пересмотренным признанием или решением об отмене."@ru
+        ] ;
+        sh:message "В этом учебном сценарии должны быть сохранены ровно три исторических решения судей."@ru
+    ] ;
+    sh:property [
+        sh:path match:hasDecision ;
+        sh:qualifiedValueShape [ sh:class match:InitialRecognition ] ;
+        sh:qualifiedMinCount 1 ;
+        sh:qualifiedMaxCount 1 ;
+        sh:message "В истории матча должно быть ровно одно первоначальное признание победителя."@ru
+    ] ;
+    sh:property [
+        sh:path match:hasDecision ;
+        sh:qualifiedValueShape [ sh:class match:RevisedRecognition ] ;
+        sh:qualifiedMinCount 1 ;
+        sh:qualifiedMaxCount 1 ;
+        sh:message "В истории матча должно быть ровно одно пересмотренное признание победителя."@ru
+    ] ;
+    sh:property [
+        sh:path match:hasDecision ;
+        sh:qualifiedValueShape [ sh:class match:CancellationDecision ] ;
+        sh:qualifiedMinCount 1 ;
+        sh:qualifiedMaxCount 1 ;
+        sh:message "В истории матча должно быть ровно одно решение об отмене."@ru
+    ] ;
+    sh:property [
+        sh:path match:hasCurrentRecognition ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:class match:InitialRecognition ;
+        sh:hasValue match:decision1_initial ;
+        sh:node match:RecognitionDecisionShape ;
+        sh:nodeKind sh:IRI ;
+        sh:message "После отмены пересмотренного решения действующим должно быть первоначальное решение 1."@ru
+    ] ;
+    sh:property [
+        sh:path match:hasLatestDecision ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:class match:CancellationDecision ;
+        sh:hasValue match:decision3_cancellation ;
+        sh:node match:CancellationDecisionShape ;
+        sh:node match:DecisionRecordShape ;
+        sh:nodeKind sh:IRI ;
+        sh:message "В текущем снимке последним актом судей должно быть ровно одно решение об отмене."@ru
     ] .

@@ -6,12 +6,33 @@
 # Каждая цель должна быть связана ровно с одним студентом.
 ex:GoalShape a sh:NodeShape ;
     sh:targetClass ex:Goal ;
-    sh:property [
-        sh:path [ sh:inversePath ex:studentSetsGoal ] ;
-        sh:class ex:Student ;
-        sh:minCount 1 ;
-        sh:maxCount 1 ;
-        sh:message "Каждая цель должна быть связана ровно с одним студентом."@ru
+
+    sh:sparql [
+        sh:message
+            "У каждой цели должен быть указан студент."@ru ;
+        sh:select """
+            PREFIX ex: <https://example.org/adaptive-student-competency-model#>
+            SELECT $this
+            WHERE {
+                FILTER NOT EXISTS {
+                    ?student ex:studentSetsGoal $this .
+                }
+            }
+        """ ;
+    ] ;
+
+    sh:sparql [
+        sh:message
+            "Каждая цель должна быть связана ровно с одним студентом."@ru ;
+        sh:select """
+            PREFIX ex: <https://example.org/adaptive-student-competency-model#>
+            SELECT $this
+            WHERE {
+                ?student1 ex:studentSetsGoal $this .
+                ?student2 ex:studentSetsGoal $this .
+                FILTER (?student1 != ?student2)
+            }
+        """ ;
     ] .
 
 # Если у освоения указан уровень больше 0, оно должно иметь доказательство.

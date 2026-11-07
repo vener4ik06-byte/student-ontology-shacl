@@ -1,0 +1,63 @@
+@prefix ex: <https://example.org/adaptive-student-competency-model#> .
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+# Каждая цель должна быть связана ровно с одним студентом.
+ex:GoalShape a sh:NodeShape ;
+    sh:targetClass ex:Goal ;
+    sh:property [
+        sh:path [ sh:inversePath ex:studentSetsGoal ] ;
+        sh:class ex:Student ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:message "Каждая цель должна быть связана ровно с одним студентом."@ru
+    ] .
+
+# Если у освоения указан уровень больше 0, оно должно иметь доказательство.
+# Выражено через SHACL Core sh:or, без SPARQL-based constraints.
+ex:MasteryShape a sh:NodeShape ;
+    sh:targetClass ex:CompetenceMastery ;
+    sh:or (
+        [
+            sh:property [
+                sh:path ex:competenceMasteryLevel ;
+                sh:maxInclusive 0
+            ]
+        ]
+        [
+            sh:property [
+                sh:path ex:competenceMasteryProvesEvidence ;
+                sh:minCount 1
+            ]
+        ]
+    ) ;
+    sh:message "Освоение с уровнем больше 0 должно иметь хотя бы одно доказательство."@ru .
+
+# Каждое требование роли указывает ровно на одну компетенцию.
+ex:RoleRequirementShape a sh:NodeShape ;
+    sh:targetClass ex:RoleRequirement ;
+    sh:property [
+        sh:path ex:roleRequirementRequiresCompetence ;
+        sh:class ex:Competence ;
+        sh:minCount 1 ;
+        sh:maxCount 1
+    ] .
+
+# Каждая профессиональная роль имеет хотя бы одно требование.
+ex:RoleShape a sh:NodeShape ;
+    sh:targetClass ex:ProfessionalRole ;
+    sh:property [
+        sh:path ex:professionalRoleHasRequirement ;
+        sh:class ex:RoleRequirement ;
+        sh:minCount 1
+    ] .
+
+# Каждая траектория развития содержит хотя бы один шаг.
+ex:TrajectoryShape a sh:NodeShape ;
+    sh:targetClass ex:DevelopmentTrajectory ;
+    sh:property [
+        sh:path ex:developmentTrajectoryConsistsOfStep ;
+        sh:class ex:TrajectoryStep ;
+        sh:minCount 1
+    ] .

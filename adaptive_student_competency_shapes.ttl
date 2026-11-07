@@ -3,40 +3,15 @@
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 
-# Каждая цель должна быть связана ровно с одним студентом.
-ex:GoalShape a sh:NodeShape ;
-    sh:targetClass ex:Goal ;
-
-    sh:sparql [
-        sh:message
-            "У каждой цели должен быть указан студент."@ru ;
-        sh:select """
-            PREFIX ex: <https://example.org/adaptive-student-competency-model#>
-            SELECT $this
-            WHERE {
-                FILTER NOT EXISTS {
-                    ?student ex:studentSetsGoal $this .
-                }
-            }
-        """ ;
-    ] ;
-
-    sh:sparql [
-        sh:message
-            "Каждая цель должна быть связана ровно с одним студентом."@ru ;
-        sh:select """
-            PREFIX ex: <https://example.org/adaptive-student-competency-model#>
-            SELECT $this
-            WHERE {
-                ?student1 ex:studentSetsGoal $this .
-                ?student2 ex:studentSetsGoal $this .
-                FILTER (?student1 != ?student2)
-            }
-        """ ;
-    ] .
+# Примечание по GoalShape:
+# Правило «каждая цель связана ровно с одним студентом» сохранено в OWL TBox
+# исходного RDF через owl:qualifiedCardinality 1 по обратному свойству.
+# В используемой конфигурации Ontosphere SHACL Core inversePath дал ложное
+# нарушение, а sh:sparql привёл к SPARQLConstraintComponent error.
+# Поэтому это правило проверяется отдельным обычным SPARQL SELECT-запросом,
+# который приложен в goal_student_count.rq. Классы и свойства модели не меняются.
 
 # Если у освоения указан уровень больше 0, оно должно иметь доказательство.
-# Выражено через SHACL Core sh:or, без SPARQL-based constraints.
 ex:MasteryShape a sh:NodeShape ;
     sh:targetClass ex:CompetenceMastery ;
     sh:or (
